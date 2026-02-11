@@ -383,6 +383,10 @@ if ( ! function_exists( 'tdrd_admin_func' ) ) {
 			</div>
 			<div class="trash-duplicates-inner">
 				<form id="sol-trash-duplicates-form" class="sol-trash-duplicates-form" method="POST" action="#">
+<?php wp_nonce_field( 'tdrd_bulk_action', 'tdrd_nonce' ); ?>
+<input type="hidden" name="action" value="tdrd_bulk_action" />
+<input type="hidden" name="page" value="trash_duplicates" />
+
 					<div class="trash-inner-top">
 						<div class="trash-duplicates-result">
 							<ul class="subsubsub">
@@ -887,15 +891,15 @@ if ( ! function_exists( 'tdrd_selected' ) ) {
 		$trash_del_action = '';
 		global $wpdb;
 		$tbl_nm = $wpdb->prefix . 'posts';
-		if ( isset( $_REQUEST['duplicates-action-top'] ) && 'none' != esc_html( sanitize_text_field( wp_unslash( $_REQUEST['duplicates-action-top'] ) ) ) ) {
-			$trash_del_action = esc_html( sanitize_text_field( wp_unslash( $_REQUEST['duplicates-action-top'] ) ) );
+		if ( is_user_logged_in() && current_user_can( 'delete_posts' ) &&  isset($_POST['tdrd_nonce']) && wp_verify_nonce( sanitize_text_field( wp_unslash($_POST['tdrd_nonce']) ), 'tdrd_bulk_action' ) ) {
+			$trash_del_action = esc_html( sanitize_text_field( wp_unslash( $_POST['duplicates-action-top'] ?? '' ) ) );
 		} else {
-			if ( isset( $_REQUEST['duplicates-action-top2'] ) ) {
-				$trash_del_action = esc_html( sanitize_text_field( wp_unslash( $_REQUEST['duplicates-action-top2'] ) ) );
+			if ( is_user_logged_in() && current_user_can( 'delete_posts' ) &&  isset($_POST['tdrd_nonce']) && wp_verify_nonce( sanitize_text_field( wp_unslash($_POST['tdrd_nonce']) ), 'tdrd_bulk_action' ) ) {
+				$trash_del_action = esc_html( sanitize_text_field( wp_unslash( $_POST['duplicates-action-top2'] ?? '' ) ) );
 			}
 		}
 		if ( $trash_sel_id ) :
-			$remove_id     = isset( $_REQUEST['chk_remove_sel'] ) ? array_map( 'sanitize_text_field', wp_unslash( $_REQUEST['chk_remove_sel'] ) ) : array();
+			$remove_id = isset($_POST['chk_remove_sel']) ? (array) wp_unslash($_POST['chk_remove_sel']) : array();
 			$count         = count( $remove_id );
 			$removed_items = array();
 			if ( 'trash' == $trash_del_action ) {
@@ -1329,10 +1333,16 @@ if ( ! function_exists( 'tdrd_trash_pages' ) ) {
 	 * Trash Pages.
 	 */
 	function tdrd_trash_pages() {
+    // Guard legacy path: only proceed when coming from our secured admin-post handler.
+    if ( ! isset($_POST['action']) || 'tdrd_bulk_action' !== $_POST['action'] ) {
+        // Do not process raw $_REQUEST parameters here.
+        return;
+    }
+    
 		// To trash multiple posts from DB.
-		if ( ( isset( $_REQUEST['take_action'] ) && isset( $_REQUEST['duplicates-action-top'] ) && 'none' != esc_html( sanitize_text_field( wp_unslash( $_REQUEST['duplicates-action-top'] ) ) ) ) || ( isset( $_REQUEST['take_action2'] ) && isset( $_REQUEST['duplicates-action-top2'] ) && 'none' != esc_html( sanitize_text_field( wp_unslash( $_REQUEST['duplicates-action-top2'] ) ) ) ) ) {
-			if ( isset( $_REQUEST['chk_remove_sel'] ) ) {
-				tdrd_selected( array_map( 'sanitize_text_field', wp_unslash( $_REQUEST['chk_remove_sel'] ) ) );
+		if ( is_user_logged_in() && current_user_can( 'delete_posts' ) &&  isset($_POST['tdrd_nonce']) && wp_verify_nonce( sanitize_text_field( wp_unslash($_POST['tdrd_nonce']) ), 'tdrd_bulk_action' ) ) {
+			if ( is_user_logged_in() && current_user_can( 'delete_posts' ) &&  isset($_POST['tdrd_nonce']) && wp_verify_nonce( sanitize_text_field( wp_unslash($_POST['tdrd_nonce']) ), 'tdrd_bulk_action' ) ) {
+				tdrd_selected( array_map( 'sanitize_text_field', wp_unslash( ( isset($_POST['chk_remove_sel']) ? wp_unslash( $_POST['chk_remove_sel'] ) : array() ) ) ) );
 			}
 		}
 		// Trashing individual items.
@@ -1429,3 +1439,51 @@ if ( ! function_exists( 'tdrd_settings' ) ) {
 		<?php
 	}
 }
+
+
+// === TDRD Security Hardening: bulk action routing via admin-post.php ===
+if ( ! function_exists( 'tdrd_handle_bulk_action' ) ) {
+    add_action( 'admin_post_tdrd_bulk_action', 'tdrd_handle_bulk_action' );
+    function tdrd_handle_bulk_action() {
+        if ( ! is_user_logged_in() || ! current_user_can( 'delete_posts' ) ) {
+            wp_die( esc_html__( 'Insufficient permissions.', 'trash-duplicate-and-301-redirect' ), 403 );
+        }
+        // Nonce check
+        if ( ! isset( $_POST['tdrd_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['tdrd_nonce'] ) ), 'tdrd_bulk_action' ) ) {
+            wp_die( esc_html__( 'Invalid request.', 'trash-duplicate-and-301-redirect' ), 403 );
+        }
+        $page = isset( $_POST['page'] ) ? sanitize_key( wp_unslash( $_POST['page'] ) ) : '';
+        if ( 'trash_duplicates' !== $page ) {
+            wp_die( esc_html__( 'Invalid context.', 'trash-duplicate-and-301-redirect' ), 403 );
+        }
+        $bulk = '';
+        if ( is_user_logged_in() && current_user_can( 'delete_posts' ) &&  isset($_POST['tdrd_nonce']) && wp_verify_nonce( sanitize_text_field( wp_unslash($_POST['tdrd_nonce']) ), 'tdrd_bulk_action' ) ) {
+            $bulk = sanitize_text_field( wp_unslash( $_POST['duplicates-action-top'] ) );
+        }
+        if ( is_user_logged_in() && current_user_can( 'delete_posts' ) &&  isset($_POST['tdrd_nonce']) && wp_verify_nonce( sanitize_text_field( wp_unslash($_POST['tdrd_nonce']) ), 'tdrd_bulk_action' ) ) {
+            $bulk = sanitize_text_field( wp_unslash( $_POST['duplicates-action-top2'] ) );
+        }
+        $ids = array();
+if ( isset($_POST['chk_remove_sel']) ) {
+    $ids = array_filter( array_map( 'absint',  (array) wp_unslash( $_POST['chk_remove_sel'] ) ) );
+}
+        if ( is_user_logged_in() && current_user_can( 'delete_posts' ) &&  isset($_POST['tdrd_nonce']) && wp_verify_nonce( sanitize_text_field( wp_unslash($_POST['tdrd_nonce']) ), 'tdrd_bulk_action' ) ) {
+            $ids = array_map( 'absint',  (array) wp_unslash( ( isset($_POST['chk_remove_sel']) ? (array) $_POST['chk_remove_sel'] : array() ) ) );
+            $ids = array_filter( $ids );
+        }
+        if ( $bulk && $ids ) {
+            foreach ( $ids as $pid ) {
+                if ( current_user_can( 'delete_post', $pid ) ) {
+                    if ( 'delete_pr' === $bulk ) {
+                        wp_delete_post( $pid, true );
+                    } else {
+                        wp_trash_post( $pid );
+                    }
+                }
+            }
+        }
+        wp_safe_redirect( add_query_arg( array( 'page' => 'trash_duplicates', 'tdrd-updated' => 1 ), admin_url( 'admin.php' ) ) );
+        exit;
+    }
+}
+

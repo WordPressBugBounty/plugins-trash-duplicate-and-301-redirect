@@ -4,9 +4,9 @@ Donate link: https://www.solwininfotech.com/product/wordpress-plugins/trash-dupl
 Support link: http://support.solwininfotech.com/
 Tags: Delete duplicate, trash duplicate, duplicates, find duplicates, fix duplicates, duplicate posts, 301 redirect, url redirect, permanent redirect, user submitted posts, delete, duplicate page, duplicate content, delete, content, delete duplicate post, duplicate post, duplicate page, delete page
 Requires at least: 5.4
-Tested up to: 6.6.1
+Tested up to: 6.8.2
 Requires PHP: 7.0
-Stable tag: 1.9
+Stable tag: 1.9.1
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -96,6 +96,12 @@ You should restore the backup you took of your website before you ran this tool.
 3. 301 Redirection List With Add/Delete Functionality
 
 == Changelog ==
+
+= 1.9.1 =
+* Security: Add capability and nonce checks for destructive bulk actions; route via admin-post.php to fix CVE-2024-13468.
+* Compat: Tested with WordPress 6.8.2 and PHP 8.4.
+
+
 
 = 1.9 =
 Release date: July 23rd, 2024

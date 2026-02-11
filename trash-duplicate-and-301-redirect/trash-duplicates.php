@@ -1,9 +1,39 @@
 <?php
+
+// === TDRD: Guarded session bootstrap (admin only) ===
+if ( ! function_exists( 'tdrd_maybe_start_session' ) ) {
+	add_action( 'init', 'tdrd_maybe_start_session', 0 );
+	function tdrd_maybe_start_session() {
+		// Only in admin screens
+		if ( ! is_admin() ) {
+			return;
+		}
+		// Skip AJAX/REST/CRON contexts
+		if ( ( defined('DOING_AJAX') && DOING_AJAX ) || ( defined('REST_REQUEST') && REST_REQUEST ) || ( defined('DOING_CRON') && DOING_CRON ) ) {
+			return;
+		}
+		// If headers already sent or a session is active, do nothing
+		if ( headers_sent() || ( function_exists('session_status') && PHP_SESSION_ACTIVE === session_status() ) ) {
+			return;
+		}
+		if ( function_exists( 'session_start' ) ) {
+			// Safe defaults; PHP 7.3+ supports options
+			$opts = array(
+				'use_strict_mode' => 1,
+				'use_cookies'     => 1,
+				'cookie_httponly' => 1,
+				'cookie_secure'   => is_ssl(),
+			);
+			
+		}
+	}
+}
+
 /**
  * Plugin Name: Trash Duplicate And 301 Redirect
  * Plugin URI: https://wordpress.org/plugins/trash-duplicate-and-301-redirect/
  * Description: Find and delete duplicates posts, custom posts and pages specifying which one to keep (newest or oldest) and 301 redirection to the post you are keeping.
- * Version: 1.9
+ * Version: 1.9.1
  * Author: Solwin Infotech
  * Author URI: https://www.solwininfotech.com/
  * Copyright: Solwin Infotech
@@ -209,29 +239,6 @@ if ( ! function_exists( 'tdrd_remove_footer_admin' ) ) {
 		return ob_get_clean();
 	}
 }
-
-add_action( 'init', 'tdrd_session_start' );
-if ( ! function_exists( 'tdrd_session_start' ) ) {
-	/**
-	 * Start session if not.
-	 */
-	function tdrd_session_start() {
-		if ( version_compare( phpversion(), '7.0.0' ) != -1 ) {
-			if ( session_status() == PHP_SESSION_NONE ) {
-				session_start( array( 'read_and_close' => true ) );
-			}
-		} elseif ( version_compare( phpversion(), '5.4.0' ) != -1 ) {
-			if ( session_status() == PHP_SESSION_NONE ) {
-				session_start();
-			}
-		} else {
-			if ( session_id() == '' ) {
-				session_start();
-			}
-		}
-	}
-}
-
 
 add_action( 'admin_head', 'tdrd_subscribe_mail', 10 );
 if ( ! function_exists( 'tdrd_subscribe_mail' ) ) {
